@@ -9,14 +9,18 @@ logging.basicConfig()
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
-reg_ex = re.compile("[ ]*([0-9]{3}): \('(\w)'\)")
-reg_ex = re.compile("[ ]*([0-9]{3}): \('(\w)'\)[.]*")
 reg_ex_part = re.compile(r".*([0-9]{3}):.*\((.*),")
 reg_ex_rest = re.compile(r"(.*),\).*")
-# reg_ex = re.compile(r".*([0-9]{3}):([.]*)")
 reg_ex_complete = re.compile(r".*([0-9]{3}):.*\((.*)\),")
-# reg_ex = re.compile(r"^.*([0-9]{3}):.*$")
-# reg_ex = re.compile(r"^.*([0-9]{3}):.*,$")
+
+trantab = str.maketrans({"'": None, ",": None})
+
+
+def add_meaning(status_codes, status_code, meanings):
+    for meaning in meanings:
+        value = meaning.translate(trantab)
+        status_codes[status_code].append(value)
+    
 
 
 def main():
@@ -28,34 +32,28 @@ def main():
         for line in response.text.split("\n"):
             if line:
                 line = line.strip()
+                meanings = None
+                status_code = None
                 if consider_next_line:
                     consider_next_line = False
-                    ls = reg_ex_rest.search(line.strip())
+                    ls = reg_ex_rest.search(line)
                     if ls:
+                        status_code = last_status_code
                         meanings = ls.groups()[0].split()
-                        for meaning in meanings:
-                            trantab = str.maketrans({"'": None, ",": None})
-                            value = meaning.translate(trantab)
-                            status_codes[last_status_code].append(value)
-
                 else:
-                    ls = reg_ex_complete.search(line.strip())
+                    ls = reg_ex_complete.search(line)
                     if ls:
+                        status_code = ls.groups()[0]
                         meanings = ls.groups()[1].split()
-                        for meaning in meanings:
-                            trantab = str.maketrans({"'": None, ",": None})
-                            value = meaning.translate(trantab)
-                            status_codes[ls.groups()[0]].append(value)
                     else:
-                        ls = reg_ex_part.search(line.strip())
+                        ls = reg_ex_part.search(line)
                         if ls:
                             consider_next_line = True
-                            last_status_code = ls.groups()[0]
+                            status_code = ls.groups()[0]
+                            last_status_code = status_code
                             meanings = ls.groups()[1].split()
-                            for meaning in meanings:
-                                trantab = str.maketrans({"'": None, ",": None})
-                                value = meaning.translate(trantab)
-                                status_codes[ls.groups()[0]].append(value)
+                if meanings and status_code:
+                    add_meaning(status_codes=status_codes, status_code=status_code, meanings=meanings)
 
     except (Exception) as e:
         logger.error(f"Error '{str(e)}'.")
